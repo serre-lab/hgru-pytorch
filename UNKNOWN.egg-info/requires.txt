@@ -1,0 +1,7 @@
+numpy
+scipy
+gitpython
+torch==0.3.1
+torchvision
+scikit-image
+matplotlib
