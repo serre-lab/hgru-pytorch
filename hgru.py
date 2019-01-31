@@ -15,7 +15,7 @@ class FFConvNet(nn.Module):
     def __init__(self,in_shape):
         super().__init__()
         self.conv0 = nn.Conv2d(1, 25, kernel_size=7, bias=False)
-        kernel = np.load("gabor.npy")
+        kernel = np.load("gabor_serre.npy")
         self.conv0.weight.data = torch.FloatTensor(kernel)
         self.conv1 = nn.Conv2d(25, 9, kernel_size=20)
 =        self.conv2 = nn.Conv2d(9, 9, kernel_size=20)
@@ -152,7 +152,7 @@ class hConvGRU(nn.Module):
 
         self.conv0 = nn.Conv2d(1, 25, kernel_size=7)
         self.timesteps = timesteps
-        part1 = np.load("gabor.npy")
+        part1 = np.load("gabor_serre.npy")
         self.conv0.weight.data = torch.FloatTensor(part1)
         self.conv6 = nn.Conv2d(25, 2, kernel_size=1)
         torch.nn.init.xavier_uniform(self.conv6.weight.data)
