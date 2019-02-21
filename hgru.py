@@ -18,7 +18,7 @@ class FFConvNet(nn.Module):
         kernel = np.load("gabor_serre.npy")
         self.conv0.weight.data = torch.FloatTensor(kernel)
         self.conv1 = nn.Conv2d(25, 9, kernel_size=20)
-=        self.conv2 = nn.Conv2d(9, 9, kernel_size=20)
+        self.conv2 = nn.Conv2d(9, 9, kernel_size=20)
         self.conv3 = nn.Conv2d(9, 9, kernel_size=20)
         self.conv4 = nn.Conv2d(9, 9, kernel_size=20)
         self.conv5 = nn.Conv2d(9, 9, kernel_size=20)
@@ -82,8 +82,8 @@ class hConvGRUCell(nn.Module):
         self.timesteps = timesteps
         self.batchnorm = batchnorm
         self.w_gate = torch.nn.Parameter(torch.randn(hidden_size, hidden_size, kernel_size, kernel_size))
-        self.u1_gate = nn.Conv2d(hidden_size, hidden_size, kernel_size, padding=self.padding)
-        self.u2_gate = nn.Conv2d(hidden_size, hidden_size, kernel_size, padding=self.padding)
+        self.u1_gate = nn.Conv2d(hidden_size, hidden_size, 1)
+        self.u2_gate = nn.Conv2d(hidden_size, hidden_size, 1)
 
         self.alpha = torch.nn.Parameter(torch.randn(hidden_size,1,1))
         self.gamma = torch.nn.Parameter(torch.randn(hidden_size,1,1))
