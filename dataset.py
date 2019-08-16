@@ -59,8 +59,9 @@ class DataSetPol(data.Dataset):
         seg_imgs = self._load_image(record.path)
         images = seg_imgs
 
-
+        #print(images, record.label)
         process_data = self.transform(images)
+        
         return process_data, record.label
 
     def __len__(self):

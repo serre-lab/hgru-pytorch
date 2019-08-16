@@ -17,7 +17,7 @@ parser.add_argument('--dropout', '--do', default=0.5, type=float,
                     metavar='DO', help='dropout ratio (default: 0.5)')
 parser.add_argument('--loss_type', type=str, default="nll",
                     choices=['nll'])
-parse.add_argument('--name', type=str, default="hgru")
+parser.add_argument('--name', type=str, default="hgru")
 
 # ========================= Learning Configs ==========================
 parser.add_argument('--epochs', default=45, type=int, metavar='N',

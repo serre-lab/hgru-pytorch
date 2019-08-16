@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch.nn.functional as F
 import math
 import torch.utils.model_zoo as model_zoo
 import torch
@@ -81,32 +82,37 @@ class hConvGRUCell(nn.Module):
         self.hidden_size = hidden_size
         self.timesteps = timesteps
         self.batchnorm = batchnorm
-        self.w_gate = torch.nn.Parameter(torch.randn(hidden_size, hidden_size, kernel_size, kernel_size))
+        
+        self.w_gate_inh = nn.Parameter(torch.randn(hidden_size, hidden_size, kernel_size, kernel_size))
+        self.w_gate_exc = nn.Parameter(torch.randn(hidden_size, hidden_size, kernel_size, kernel_size))
+        
         self.u1_gate = nn.Conv2d(hidden_size, hidden_size, 1)
         self.u2_gate = nn.Conv2d(hidden_size, hidden_size, 1)
 
-        self.alpha = torch.nn.Parameter(torch.randn(hidden_size,1,1))
-        self.gamma = torch.nn.Parameter(torch.randn(hidden_size,1,1))
-        self.kappa = torch.nn.Parameter(torch.randn(hidden_size,1,1))
-        self.w = torch.nn.Parameter(torch.randn(hidden_size,1,1))
-        self.mu= torch.nn.Parameter(torch.randn(hidden_size,1,1))
+        self.alpha = nn.Parameter(torch.full((hidden_size,1,1), 0.1))
+        self.gamma = nn.Parameter(torch.full((hidden_size,1,1), 1.0))
+        self.kappa = nn.Parameter(torch.full((hidden_size,1,1), 0.5))
+        self.w = nn.Parameter(torch.full((hidden_size,1,1), 0.5))
+        self.mu= nn.Parameter(torch.full((hidden_size,1,1), 1))
 
         if self.batchnorm:
-            self.bn = nn.ModuleList([BatchNorm2d1(25, momentum=0.001, eps=1e-03) for i in range(self.timesteps*4)])
+            self.bn = nn.ModuleList([nn.BatchNorm2d(25, momentum=0.001, eps=1e-03) for i in range(self.timesteps*4)])
         else:
-            self.n = torch.nn.Parameter(torch.randn(self.timesteps,1,1))
+            self.n = nn.Parameter(torch.randn(self.timesteps,1,1))
 
 
-        init.xavier_normal_(self.w_gate)
-        init.xavier_normal_(self.u1_gate.weight)
-        init.xavier_normal_(self.u2_gate.weight)
-        self.u1_gate.bias.data =  torch.log(torch.nn.init.uniform(self.u1_gate.bias.data, 1, 8.0 - 1))
-        self.u2_gate.bias.data =  torch.log(torch.nn.init.uniform(self.u2_gate.bias.data, 1, 8.0 - 1))
-        init.xavier_normal_(self.alpha)
-        init.xavier_normal_(self.gamma)
-        init.xavier_normal_(self.mu)
-        init.xavier_normal_(self.kappa)
-        init.xavier_normal_(self.w)
+        init.orthogonal_(self.w_gate_inh)
+        init.orthogonal_(self.w_gate_exc)
+        init.orthogonal_(self.u1_gate.weight)
+        init.orthogonal_(self.u2_gate.weight)
+        self.u1_gate.bias.data =  torch.log(init.uniform_(self.u1_gate.bias.data, 1, 8.0 - 1))
+        self.u2_gate.bias.data =  -self.u1_gate.bias.data
+        
+#        init.orthogonal_(self.alpha)
+#        init.orthogonal_(self.gamma)
+#        init.orthogonal_(self.mu)
+#        init.orthogonal_(self.kappa)
+#        init.orthogonal_(self.w)
 
     def forward(self, input_, prev_state2, timestep=0):
         # get batch and spatial sizes
@@ -117,29 +123,35 @@ class hConvGRUCell(nn.Module):
         if timestep == 0:
             state_size = [batch_size, self.hidden_size] + list(spatial_size)
             prev_state2 = torch.randn(state_size)
-            init.xavier_normal_(prev_state2)
+            init.orthogonal_(prev_state2)
             prev_state2 = torch.autograd.Variable(prev_state2).cuda()
 
         # data size is [batch, channel, height, width]
-        kernel = (self.w_gate + self.w_gate.permute(1,0,2,3)) * 0.5
+        #kernel_inh = (self.w_gate + self.w_gate.permute(1,0,2,3)) * 0.5
+        #import pdb; pdb.set_trace()
+        i = timestep
         if self.batchnorm:
 
-            g1_t = torch.nn.functional.sigmoid(self.bn[i*4](self.u1_gate(prev_state2)))
-            c1_t = self.bn[i*4+1](torch.nn.functional.conv2d(prev_state2 * g1_t, kernel, padding=self.padding))
-            next_state1 = torch.nn.functional.tanh(input_ - c1_t*(self.alpha*prev_state2 + self.mu))
-            g2_t = torch.nn.functional.sigmoid(self.bn[i*4+2](self.u2_gate(next_state1)))
-            c2_t = self.bn[i*4+3](torch.nn.functional.conv2d(next_state1, kernel, padding=self.padding))
-            h2_t = torch.nn.functional.tanh(self.kappa*(next_state1 + self.gamma*c2_t) + (self.w*(next_state1*(self.gamma*c2_t))))
+            g1_t = torch.sigmoid(self.bn[i*4](self.u1_gate(prev_state2)))
+            c1_t = self.bn[i*4+1](F.conv2d(prev_state2 * g1_t, self.w_gate_inh, padding=self.padding))
+            
+            next_state1 = F.relu(input_ - F.relu(c1_t*(self.alpha*prev_state2 + self.mu)))
+            
+            g2_t = torch.sigmoid(self.bn[i*4+2](self.u2_gate(next_state1)))
+            c2_t = self.bn[i*4+3](F.conv2d(next_state1, self.w_gate_exc, padding=self.padding))
+            
+            h2_t = torch.tanh(self.kappa*(next_state1 + self.gamma*c2_t) + (self.w*(next_state1*(self.gamma*c2_t))))
+            
             prev_state2 = ((1 - g2_t)*prev_state2 + g2_t*h2_t)
 
         else:
 
-            g1_t = torch.nn.functional.sigmoid(self.u1_gate(prev_state2))
-            c1_t = torch.nn.functional.conv2d(prev_state2 * g1_t, kernel, padding=self.padding)
-            next_state1 = torch.nn.functional.tanh(input_ - c1_t*(self.alpha*prev_state2 + self.mu))
-            g2_t = torch.nn.functional.sigmoid(self.bn[i*4+2](self.u2_gate(next_state1)))
-            c2_t = torch.nn.functional.conv2d(next_state1, kernel, padding=self.padding)
-            h2_t = torch.nn.functional.tanh(self.kappa*(next_state1 + self.gamma*c2_t) + (self.w*(next_state1*(self.gamma*c2_t))))
+            g1_t = F.sigmoid(self.u1_gate(prev_state2))
+            c1_t = F.conv2d(prev_state2 * g1_t, self.w_gate_inh, padding=self.padding)
+            next_state1 = F.tanh(input_ - c1_t*(self.alpha*prev_state2 + self.mu))
+            g2_t = F.sigmoid(self.bn[i*4+2](self.u2_gate(next_state1)))
+            c2_t = F.conv2d(next_state1, self.w_gate_exc, padding=self.padding)
+            h2_t = F.tanh(self.kappa*(next_state1 + self.gamma*c2_t) + (self.w*(next_state1*(self.gamma*c2_t))))
             prev_state2 = self.n[timestep,...]*((1 - g2_t)*prev_state2 + g2_t*h2_t)
 
         return prev_state2
@@ -150,32 +162,33 @@ class hConvGRU(nn.Module):
     def __init__(self, timesteps=8):
         super().__init__()
 
-        self.conv0 = nn.Conv2d(1, 25, kernel_size=7)
+        self.conv0 = nn.Conv2d(1, 25, kernel_size=7, padding=3)
         self.timesteps = timesteps
         part1 = np.load("gabor_serre.npy")
         self.conv0.weight.data = torch.FloatTensor(part1)
         self.conv6 = nn.Conv2d(25, 2, kernel_size=1)
-        torch.nn.init.xavier_uniform(self.conv6.weight.data)
+        init.xavier_uniform_(self.conv6.weight.data)
         self.bn2 = nn.BatchNorm2d(2)
-        self.bn = nn.BatchNorm2d(2)
-        self.maxpool = nn.MaxPool2d(144, stride=1)
+        self.bn = nn.BatchNorm2d(25)
+        self.maxpool = nn.MaxPool2d(150, stride=1)
         self.fc = nn.Linear(2, 2)
 
-        self.unit1 = hConvGRUCell3(25, 25, 3)
+        self.unit1 = hConvGRUCell(25, 25, 3)
         self.unit1.train()
 
 
     def forward(self, x):
         internal_state = None
-        x = x
+        #x = x
+        #import pdb; pdb.set_trace()
         x = self.conv0(x)
         x = torch.pow(x, 2)
-
+        
         for i in range(self.timesteps):
             internal_state  = self.unit1(x, internal_state, timestep=i)
-
-        output = self.conv6(internal_state)
-        output = self.bn(output)
+        
+        output = self.bn(internal_state)
+        output = self.conv6(output)
         output = self.maxpool(output)
         output = self.bn2(output)
         output = output.view(output.size(0), -1)
