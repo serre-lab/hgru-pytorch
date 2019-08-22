@@ -1,15 +1,9 @@
 import torch.nn as nn
 import torch.nn.functional as F
-import math
-import torch.utils.model_zoo as model_zoo
 import torch
 import numpy as np
-from scipy import ndimage as ndi
-
-import cv2
-import scipy
 from torch.nn import init
-import time
+
 
 from batchnorm_initfixed import BatchNorm2d
 
