@@ -1,9 +1,6 @@
 import torchvision
-import random
 from PIL import Image, ImageOps
 import numpy as np
-import numbers
-import math
 import torch
 
 

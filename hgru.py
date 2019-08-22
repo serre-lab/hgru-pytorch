@@ -102,29 +102,22 @@ class hConvGRUCell(nn.Module):
         else:
             self.n = nn.Parameter(torch.randn(self.timesteps,1,1))
 
-
         init.orthogonal_(self.w_gate_inh)
         init.orthogonal_(self.w_gate_exc)
         init.orthogonal_(self.u1_gate.weight)
         init.orthogonal_(self.u2_gate.weight)
         self.u1_gate.bias.data =  torch.log(init.uniform_(self.u1_gate.bias.data, 1, 8.0 - 1))
         self.u2_gate.bias.data =  -self.u1_gate.bias.data
-        
-#        init.orthogonal_(self.alpha)
-#        init.orthogonal_(self.gamma)
-#        init.orthogonal_(self.mu)
-#        init.orthogonal_(self.kappa)
-#        init.orthogonal_(self.w)
+
 
     def forward(self, input_, prev_state2, timestep=0):
-        # generate empty prev_state, if None is provided
+
         if timestep == 0:
             prev_state2 = torch.zeros_like(input_).cuda()
 
         #import pdb; pdb.set_trace()
         i = timestep
         if self.batchnorm:
-
             g1_t = torch.sigmoid(self.bn[0](self.u1_gate(prev_state2)))
             c1_t = self.bn[1](F.conv2d(prev_state2 * g1_t, self.w_gate_inh, padding=self.padding))
             
@@ -133,12 +126,11 @@ class hConvGRUCell(nn.Module):
             g2_t = torch.sigmoid(self.bn[2](self.u2_gate(next_state1)))
             c2_t = self.bn[3](F.conv2d(next_state1, self.w_gate_exc, padding=self.padding))
             
-            h2_t = F.relu(self.kappa*(next_state1 + self.gamma*c2_t) + (self.w*(next_state1*(self.gamma*c2_t))))
+            h2_t = F.relu(self.kappa*next_state1 + self.gamma*c2_t + self.w*next_state1*c2_t)
             
             prev_state2 = ((1 - g2_t)*prev_state2 + g2_t*h2_t)
 
         else:
-
             g1_t = F.sigmoid(self.u1_gate(prev_state2))
             c1_t = F.conv2d(prev_state2 * g1_t, self.w_gate_inh, padding=self.padding)
             next_state1 = F.tanh(input_ - c1_t*(self.alpha*prev_state2 + self.mu))
@@ -172,16 +164,13 @@ class hConvGRU(nn.Module):
 
     def forward(self, x):
         internal_state = None
-        #x = x
         #import pdb; pdb.set_trace()
         x = self.conv0(x)
         x = torch.pow(x, 2)
         
         for i in range(self.timesteps):
-            
             internal_state  = self.unit1(x, internal_state, timestep=i)
-            
-        
+
         output = self.bn(internal_state)
         output = self.conv6(output)
         output = self.maxpool(output)
