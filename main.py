@@ -37,10 +37,6 @@ def plot_grad_flow(named_parameters):
             ave_grads.append(p.grad.abs().mean())
             max_grads.append(p.grad.abs().max())
     
-    
-    
-    
-    
     plt.bar(np.arange(len(max_grads)), max_grads, alpha=0.1, lw=1, color="c")
     plt.bar(np.arange(len(max_grads)), ave_grads, alpha=0.1, lw=1, color="b")
     plt.hlines(0, 0, len(ave_grads)+1, lw=2, color="k" )
@@ -126,10 +122,11 @@ def main():
         f_training.append(train_accuracy)
         if (epoch + 1) % 1 == 0 or epoch == args.epochs - 1:
             prec1 = validate(val_loader, model, (epoch + 1) * len(train_loader), criterion)
-            prec2 = validate(val_loader, model, (epoch + 1) * len(train_loader), criterion)
-            prec3 = validate(val_loader, model, (epoch + 1) * len(train_loader), criterion)
-            prec4 = validate(val_loader, model, (epoch + 1) * len(train_loader), criterion)
-            prec = (prec1+prec2+prec3+prec4)/4.0
+#            prec2 = validate(val_loader, model, (epoch + 1) * len(train_loader), criterion)
+#            prec3 = validate(val_loader, model, (epoch + 1) * len(train_loader), criterion)
+#            prec4 = validate(val_loader, model, (epoch + 1) * len(train_loader), criterion)
+            #prec = (prec1+prec2+prec3+prec4)/4.0
+            prec = prec1
             f_val.append(prec)
             is_best = prec > best_prec1
             if is_best:
@@ -157,29 +154,34 @@ def train(train_loader, model, optimizer, epoch, criterion):
     model.train()
     for i, (input, target) in enumerate(train_loader):
         data_time.update(time.time() - end)
+        
         target = target.cuda()
         input_var = torch.autograd.Variable(input).cuda()
         target_var = torch.autograd.Variable(target)
-
+        
 
         # compute output for the number of timesteps selected by train loader
         output  = model.forward(x=input_var)
+        
         loss = criterion(output, target_var)
         #import pdb; pdb.set_trace()
         prec1, prec5 = accuracy(output.data, target, topk=(1, 2))
         losses.update(loss.data, input_var.size(0))
         top1.update(prec1, input.size(0))
         top5.update(prec5, input.size(0))
-
+        
         loss.backward()
+        #nn.utils.clip_grad_norm_(model.parameters(), 0.1)
         #plot_grad_flow(model.named_parameters())
+        
         optimizer.step()
+        
         optimizer.zero_grad()
         batch_time.update(time.time() - end)
-        end = time.time()
+        
 
         if i % args.print_freq == 0:
-            if i % args.print_freq == 0:
+            if i % args.print_freq+10 == 0:
                 print(('Epoch: [{0}][{1}/{2}], lr: {lr:.5f}\t'
                    'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                    'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
@@ -188,6 +190,8 @@ def train(train_loader, model, optimizer, epoch, criterion):
                    'Loss {loss.val:.6f} ({loss.avg:.6f})'.format(epoch, i, len(train_loader), batch_time=batch_time,
                 data_time=data_time, loss=losses, lr=args.lr, top1=top1, top5=top5)))
         #import pdb; pdb.set_trace()
+        end = time.time()
+        
     return top1.avg
 
 def validate(val_loader, model, iter, criterion, logger=None):
@@ -205,8 +209,8 @@ def validate(val_loader, model, iter, criterion, logger=None):
             #Change if using pytorch > 0.3
             #print(input)
             target = target.cuda()
-            input_var = torch.autograd.Variable(input, volatile=True).cuda()
-            target_var = torch.autograd.Variable(target, volatile=True)
+            input_var = torch.autograd.Variable(input).cuda()
+            target_var = torch.autograd.Variable(target)
     
             # compute output
             output = model.forward(x=input_var)

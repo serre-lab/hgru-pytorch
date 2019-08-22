@@ -1,21 +1,10 @@
 import torch.utils.data as data
-
 from PIL import Image
 import os
-import random as randm
-import os.path
-import numpy as np
-from numpy.random import randint
-
-import torch.utils.data as data
-
-from PIL import Image
-import os
-import os.path
 
 class VideoRecord(object):
-    def __init__(self, row):
-        self._data = row
+    def __init__(self, root_path, row):
+        self._data = [os.path.join(root_path, row[0]), row[1]]
 
     @property
     def path(self):
@@ -24,7 +13,6 @@ class VideoRecord(object):
     @property
     def label(self):
         return int(self._data[1])
-
 
 class DataSetPol(data.Dataset):
     def __init__(self, root_path, list_file, modality='RGB', transform=None, random_shift=True, test_mode=False):
@@ -37,7 +25,6 @@ class DataSetPol(data.Dataset):
         self.random_shift = random_shift
         self.test_mode = test_mode
 
-
         self._parse_list()
 
     def _load_image(self, directory):
@@ -47,21 +34,16 @@ class DataSetPol(data.Dataset):
             return [Image.open(directory).convert('L')]
 
     def _parse_list(self):
-        self.video_list = [VideoRecord(x.strip().split(' ')) for x in open(self.list_file)]
-
+        self.video_list = [VideoRecord(self.root_path, x.strip().split(' ')) for x in open(self.list_file)]
 
     def __getitem__(self, index):
         record = self.video_list[index]
-
         return self.get(record)
 
     def get(self, record):
         seg_imgs = self._load_image(record.path)
         images = seg_imgs
-
-        #print(images, record.label)
         process_data = self.transform(images)
-        
         return process_data, record.label
 
     def __len__(self):

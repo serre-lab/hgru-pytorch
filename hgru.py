@@ -9,7 +9,9 @@ from scipy import ndimage as ndi
 import cv2
 import scipy
 from torch.nn import init
+import time
 
+from batchnorm_initfixed import BatchNorm2d
 
 class FFConvNet(nn.Module):
 
@@ -96,7 +98,7 @@ class hConvGRUCell(nn.Module):
         self.mu= nn.Parameter(torch.full((hidden_size,1,1), 1))
 
         if self.batchnorm:
-            self.bn = nn.ModuleList([nn.BatchNorm2d(25, momentum=0.001, eps=1e-03) for i in range(self.timesteps*4)])
+            self.bn = nn.ModuleList([BatchNorm2d(25, eps=1e-03, track_running_stats=False) for i in range(4)])
         else:
             self.n = nn.Parameter(torch.randn(self.timesteps,1,1))
 
@@ -115,32 +117,23 @@ class hConvGRUCell(nn.Module):
 #        init.orthogonal_(self.w)
 
     def forward(self, input_, prev_state2, timestep=0):
-        # get batch and spatial sizes
-        batch_size = input_.data.size()[0]
-        spatial_size = input_.data.size()[2:]
-
         # generate empty prev_state, if None is provided
         if timestep == 0:
-            state_size = [batch_size, self.hidden_size] + list(spatial_size)
-            prev_state2 = torch.randn(state_size)
-            init.orthogonal_(prev_state2)
-            prev_state2 = torch.autograd.Variable(prev_state2).cuda()
+            prev_state2 = torch.zeros_like(input_).cuda()
 
-        # data size is [batch, channel, height, width]
-        #kernel_inh = (self.w_gate + self.w_gate.permute(1,0,2,3)) * 0.5
         #import pdb; pdb.set_trace()
         i = timestep
         if self.batchnorm:
 
-            g1_t = torch.sigmoid(self.bn[i*4](self.u1_gate(prev_state2)))
-            c1_t = self.bn[i*4+1](F.conv2d(prev_state2 * g1_t, self.w_gate_inh, padding=self.padding))
+            g1_t = torch.sigmoid(self.bn[0](self.u1_gate(prev_state2)))
+            c1_t = self.bn[1](F.conv2d(prev_state2 * g1_t, self.w_gate_inh, padding=self.padding))
             
             next_state1 = F.relu(input_ - F.relu(c1_t*(self.alpha*prev_state2 + self.mu)))
             
-            g2_t = torch.sigmoid(self.bn[i*4+2](self.u2_gate(next_state1)))
-            c2_t = self.bn[i*4+3](F.conv2d(next_state1, self.w_gate_exc, padding=self.padding))
+            g2_t = torch.sigmoid(self.bn[2](self.u2_gate(next_state1)))
+            c2_t = self.bn[3](F.conv2d(next_state1, self.w_gate_exc, padding=self.padding))
             
-            h2_t = torch.tanh(self.kappa*(next_state1 + self.gamma*c2_t) + (self.w*(next_state1*(self.gamma*c2_t))))
+            h2_t = F.relu(self.kappa*(next_state1 + self.gamma*c2_t) + (self.w*(next_state1*(self.gamma*c2_t))))
             
             prev_state2 = ((1 - g2_t)*prev_state2 + g2_t*h2_t)
 
@@ -168,8 +161,8 @@ class hConvGRU(nn.Module):
         self.conv0.weight.data = torch.FloatTensor(part1)
         self.conv6 = nn.Conv2d(25, 2, kernel_size=1)
         init.xavier_uniform_(self.conv6.weight.data)
-        self.bn2 = nn.BatchNorm2d(2)
-        self.bn = nn.BatchNorm2d(25)
+        self.bn2 = BatchNorm2d(2)
+        self.bn = BatchNorm2d(25)
         self.maxpool = nn.MaxPool2d(150, stride=1)
         self.fc = nn.Linear(2, 2)
 
@@ -185,7 +178,9 @@ class hConvGRU(nn.Module):
         x = torch.pow(x, 2)
         
         for i in range(self.timesteps):
+            
             internal_state  = self.unit1(x, internal_state, timestep=i)
+            
         
         output = self.bn(internal_state)
         output = self.conv6(output)
