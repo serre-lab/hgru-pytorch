@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-
+plt.ion()
+plt.show()
 class AverageMeter(object):
     """Computes and stores the average and current value"""
 
@@ -47,17 +48,23 @@ def plot_grad_flow(named_parameters):
     max_grads= []
     layers = []
     for n, p in named_parameters:
-        if(p.requires_grad) and ("bias" not in n):
-            layers.append(n)
+        if(p.requires_grad) and ("biasqq" not in n) and (p.grad is not None):
+            
             ave_grads.append(p.grad.abs().mean())
             max_grads.append(p.grad.abs().max())
+            if p.grad.abs().mean() == 0:
+                layers.append(n + "ZERO")
+            elif p.grad.abs().mean() < 0.00001:
+                layers.append(n + "SMALL")
+            else:
+                layers.append(n)
     
     plt.bar(np.arange(len(max_grads)), max_grads, alpha=0.1, lw=1, color="c")
     plt.bar(np.arange(len(max_grads)), ave_grads, alpha=0.1, lw=1, color="b")
     plt.hlines(0, 0, len(ave_grads)+1, lw=2, color="k" )
     plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical")
     plt.xlim(left=0, right=len(ave_grads))
-    #plt.ylim(bottom = -0.001, top=0.0002) # zoom in on the lower gradient regions
+    plt.ylim(bottom = -0.001, top=0.2) # zoom in on the lower gradient regions
     plt.xlabel("Layers")
     plt.ylabel("average gradient")
     plt.title("Gradient flow")

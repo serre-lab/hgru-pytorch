@@ -42,6 +42,7 @@ class DataSetPol(data.Dataset):
 
     def get(self, record):
         seg_imgs = self._load_image(record.path)
+        #print(record.path, record.label)
         images = seg_imgs
         process_data = self.transform(images)
         return process_data, record.label

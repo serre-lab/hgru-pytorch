@@ -17,7 +17,8 @@ import numpy as np
 from dataset import DataSetPol
 from hgru import hConvGRU, FFConvNet
 from transforms import GroupScale, Augmentation, Stack, ToTorchFormatTensor
-from misc_functions import AverageMeter, accuracy
+from misc_functions import AverageMeter, accuracy, plot_grad_flow
+from statistics import mean
 
 from opts import parser
 
@@ -40,6 +41,8 @@ train_loader = torch.utils.data.DataLoader(DataSetPol("/media/data_cifs/curvy_2s
 print("Loading validation dataset")
 val_loader = torch.utils.data.DataLoader(DataSetPol("/media/data_cifs/curvy_2snakes_300/", args.val_list, transform = transform_list),
     batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=True)
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def validate(val_loader, model, iter, criterion, logger=None):
     batch_time = AverageMeter()
@@ -83,14 +86,14 @@ if __name__ == '__main__':
 
     print("Init model")
     if args.parallel == True:
-        model = hConvGRU(timesteps=8)
-        model = torch.nn.DataParallel(model, device_ids=[0]).cuda()
-        print("Loading parallel finished")
+        model = hConvGRU(timesteps=8, filt_size = 15)
+        model = torch.nn.DataParallel(model).to(device)
+        print("Loading parallel finished on GPU count:", torch.cuda.device_count())
     else:
-        model = hConvGRU(timesteps=8).cuda()
+        model = hConvGRU(timesteps=8, filt_size = 15).to(device)
         print("Loading finished")
 
-    criterion = torch.nn.CrossEntropyLoss().cuda()
+    criterion = torch.nn.CrossEntropyLoss().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     lr_init = args.lr
@@ -110,20 +113,25 @@ if __name__ == '__main__':
         for i, (imgs, target) in enumerate(train_loader):
             data_time.update(time.perf_counter() - end)
             
-            imgs = imgs.cuda()
-            target = target.cuda()
+            imgs = imgs.to(device)
+            target = target.to(device)
             
+#            if i==0:
+#                imgs_perm = imgs
+#                target_perm = target
+#            imgs = imgs_perm
+#            target = target_perm
             output  = model.forward(imgs)
             #import pdb; pdb.set_trace()
             
             loss = criterion(output, target)
             [prec1] = accuracy(output.data, target, topk=(1,))
             
-            losses.update(loss.data, imgs.size(0))
-            top1.update(prec1, imgs.size(0))
+            losses.update(loss.data.item(), imgs.size(0))
+            top1.update(prec1.data.item(), imgs.size(0))
             
             loss.backward()
-            #nn.utils.clip_grad_norm_(model.parameters(), 0.1)
+            #torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
             #plot_grad_flow(model.named_parameters())
             optimizer.step()
             optimizer.zero_grad()
@@ -132,9 +140,10 @@ if __name__ == '__main__':
             
             end = time.perf_counter()
             if i % (args.print_freq) == 0:
+                #plot_grad_flow(model.named_parameters())
                 print('Epoch: [{0}][{1}/{2}]\t lr: {lr:g}\t Time: {batch_time.val:.3f} ({batch_time.avg:.3f})\t Data: {data_time.val:.3f} ({data_time.avg:.3f})\t'
-                       'Prec: {top1.val:.3f} ({top1.avg:.3f})\t Loss: {loss.val:.6f} ({loss.avg:.6f})'.format(epoch, i, len(train_loader), batch_time=batch_time,
-                        data_time=data_time, loss=losses, lr=args.lr, top1=top1))
+                       'Prec: {top1.val:.3f} ({precprint:.3f}) ({top1.avg:.3f})\t Loss: {loss.val:.6f} ({lossprint:.6f}) ({loss.avg:.6f})'.format(epoch, i, len(train_loader), batch_time=batch_time,
+                        data_time=data_time, loss=losses, lossprint= mean(losses.history[-args.print_freq:]), lr=args.lr, top1=top1, precprint= mean(top1.history[-args.print_freq:])))
             
         f_training.append(top1.avg)
         train_loss_history += losses.history

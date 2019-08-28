@@ -5,3 +5,4 @@ file_finder.py
 test_images.txt
 train_images.txt
 *.pth.tar
+*.npy

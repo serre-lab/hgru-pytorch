@@ -17,6 +17,7 @@ class GroupScale(object):
         self.worker = torchvision.transforms.Resize(size, interpolation)
 
     def __call__(self, img_group):
+
         return [self.worker(img) for img in img_group]
 
 class Augmentation(object):
