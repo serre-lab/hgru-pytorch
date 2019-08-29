@@ -18,15 +18,15 @@ from dataset import DataSetPol
 from hgru import hConvGRU, FFConvNet
 from transforms import GroupScale, Augmentation, Stack, ToTorchFormatTensor
 from misc_functions import AverageMeter, accuracy, plot_grad_flow
-from statistics import mean
+# from statistics import mean
 
 from opts import parser
 
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-plt.ion()
-plt.show()
+# plt.ion()
+# plt.show()
 
 global best_prec1
 best_prec1 = 0
@@ -109,9 +109,9 @@ if __name__ == '__main__':
         top1 = AverageMeter()
     
         model.train()
-        end = time.perf_counter()
+        end = time.time()  # perf_counter()
         for i, (imgs, target) in enumerate(train_loader):
-            data_time.update(time.perf_counter() - end)
+            data_time.update(time.time() - end)
             
             imgs = imgs.to(device)
             target = target.to(device)
@@ -136,14 +136,14 @@ if __name__ == '__main__':
             optimizer.step()
             optimizer.zero_grad()
 
-            batch_time.update(time.perf_counter() - end)
+            batch_time.update(time.time() - end)
             
-            end = time.perf_counter()
+            end = time.time()
             if i % (args.print_freq) == 0:
                 #plot_grad_flow(model.named_parameters())
                 print('Epoch: [{0}][{1}/{2}]\t lr: {lr:g}\t Time: {batch_time.val:.3f} ({batch_time.avg:.3f})\t Data: {data_time.val:.3f} ({data_time.avg:.3f})\t'
                        'Prec: {top1.val:.3f} ({precprint:.3f}) ({top1.avg:.3f})\t Loss: {loss.val:.6f} ({lossprint:.6f}) ({loss.avg:.6f})'.format(epoch, i, len(train_loader), batch_time=batch_time,
-                        data_time=data_time, loss=losses, lossprint= mean(losses.history[-args.print_freq:]), lr=args.lr, top1=top1, precprint= mean(top1.history[-args.print_freq:])))
+                        data_time=data_time, loss=losses, lossprint= np.mean(losses.history[-args.print_freq:]), lr=args.lr, top1=top1, precprint= np.mean(top1.history[-args.print_freq:])))
             
         f_training.append(top1.avg)
         train_loss_history += losses.history
@@ -161,7 +161,4 @@ if __name__ == '__main__':
 
     np.array(f_training).dump(open("{}.npy".format(args.name),'w'))
     np.array(f_val).dump(open("{}.npy".format(args.name),'w'))
-
-
-
 

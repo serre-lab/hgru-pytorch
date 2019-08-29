@@ -9,7 +9,7 @@ from torch.nn import init
 class FFConvNet(nn.Module):
 
     def __init__(self, timesteps=8):
-        super().__init__()
+        # super().__init__()
         self.conv0 = nn.Conv2d(1, 25, kernel_size=7, bias=False, padding=3)
         kernel = np.load("gabor_serre.npy")
         self.conv0.weight.data = torch.FloatTensor(kernel)
@@ -75,7 +75,8 @@ class hConvGRUCell(nn.Module):
     """
 
     def __init__(self, input_size, hidden_size, kernel_size, batchnorm=True, timesteps=8):
-        super().__init__()
+        # super().__init__()
+        super(hConvGRUCell, self).__init__()
         self.padding = kernel_size // 2
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -164,8 +165,9 @@ class hConvGRUCell(nn.Module):
 
 class hConvGRU(nn.Module):
 
-    def __init__(self, timesteps=8, filt_size = 9):
-        super().__init__()
+    def __init__(self, timesteps=8, filt_size = 15):
+        # super().__init__()
+        super(hConvGRU, self).__init__()
         self.timesteps = timesteps
         
         self.conv0 = nn.Conv2d(1, 25, kernel_size=7, padding=3)
