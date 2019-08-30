@@ -96,9 +96,12 @@ class hConvGRUCell(nn.Module):
         self.w = nn.Parameter(torch.empty((hidden_size,1,1)))
         self.mu= nn.Parameter(torch.empty((hidden_size,1,1)))
 
+        self.scale = nn.Parameter(torch.empty((4,1,1)))
+        self.intercept = nn.Parameter(torch.empty((4,1,1)))
+
         if self.batchnorm:
             #self.bn = nn.ModuleList([nn.GroupNorm(25, 25, eps=1e-03) for i in range(32)])
-            self.bn = nn.ModuleList([nn.BatchNorm2d(25, eps=1e-03) for i in range(32)])
+            self.bn = nn.ModuleList([nn.BatchNorm2d(25, eps=1e-03, affine=False) for i in range(32)])
         else:
             self.n = nn.Parameter(torch.randn(self.timesteps,1,1))
 
@@ -115,15 +118,16 @@ class hConvGRUCell(nn.Module):
         init.orthogonal_(self.u1_gate.weight)
         init.orthogonal_(self.u2_gate.weight)
         
-        for bn in self.bn:
-            init.constant_(bn.weight, 0.1)
+        # for bn in self.bn:
+        #     init.constant_(bn.weight, 0.1)
         
         init.constant_(self.alpha, 0.1)
         init.constant_(self.gamma, 1.0)
         init.constant_(self.kappa, 0.5)
         init.constant_(self.w, 0.5)
         init.constant_(self.mu, 1)
-        
+        init.constant_(self.scale, 0.1)
+        init.constant_(self.intercept, 0.) 
         init.uniform_(self.u1_gate.bias.data, 1, 8.0 - 1)
         self.u1_gate.bias.data.log()
         self.u2_gate.bias.data =  -self.u1_gate.bias.data
@@ -138,14 +142,14 @@ class hConvGRUCell(nn.Module):
         #import pdb; pdb.set_trace()
         i = timestep
         if self.batchnorm:
-            g1_t = torch.sigmoid(self.bn[i*4+0](self.u1_gate(prev_state2)))
-            c1_t = self.bn[i*4+1](F.conv2d(prev_state2 * g1_t, self.w_gate_inh, padding=self.padding))
+            g1_t = torch.sigmoid(self.bn[i*4+0](self.u1_gate(prev_state2) * self.scale[0] + self.mu[0]))
+            c1_t = self.bn[i*4+1](F.conv2d(prev_state2 * g1_t, self.w_gate_inh, padding=self.padding)) * self.scale[1] + self.mu[1]
             
             next_state1 = F.relu(input_ - F.relu(c1_t*(self.alpha*prev_state2 + self.mu)))
             #next_state1 = F.relu(input_ - c1_t*(self.alpha*prev_state2 + self.mu))
             
-            g2_t = torch.sigmoid(self.bn[i*4+2](self.u2_gate(next_state1)))
-            c2_t = self.bn[i*4+3](F.conv2d(next_state1, self.w_gate_exc, padding=self.padding))
+            g2_t = torch.sigmoid(self.bn[i*4+2](self.u2_gate(next_state1)) * self.scale[2] + self.mu[2])
+            c2_t = self.bn[i*4+3](F.conv2d(next_state1, self.w_gate_exc, padding=self.padding)) * self.scale[3] + self.mu[3]
             
             h2_t = F.relu(self.kappa*next_state1 + self.gamma*c2_t + self.w*next_state1*c2_t)
             #h2_t = F.relu(self.kappa*next_state1 + self.kappa*self.gamma*c2_t + self.w*next_state1*self.gamma*c2_t)
@@ -205,13 +209,14 @@ class hConvGRU(nn.Module):
         for i in range(self.timesteps):
             internal_state  = self.unit1(x, internal_state, timestep=i)
             if i == self.timesteps - 2:
-                states += [detach_param_with_grad([internal_state])[0]]
+                # states += [detach_param_with_grad([internal_state])[0]]
+                states += [internal_state]
             elif i == self.timesteps - 1:
                 states += [internal_state]
 
         assert len(states) == 2
         output = self.bn(internal_state)
-        output = F.leaky_relu(self.conv6(output))
+        output = F.relu(self.conv6(output))
         output = self.maxpool(output)
         output = self.bn2(output)
         output = output.view(output.size(0), -1)

@@ -92,7 +92,7 @@ if __name__ == '__main__':
         model = hConvGRU(timesteps=8, filt_size = 15).to(device)
         print("Loading finished")
 
-    grad_method = 't'  # 'RBP'
+    grad_method = 'RBP'
     criterion = torch.nn.CrossEntropyLoss().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
@@ -130,10 +130,6 @@ if __name__ == '__main__':
             param_update = params[:-output_idx]
             name_update = names[:-output_idx]
 
-            [prec1] = accuracy(output.data, target, topk=(1,))
-            
-            losses.update(loss.data.item(), imgs.size(0))
-            top1.update(prec1.data.item(), imgs.size(0))
             if grad_method == 'RBP':
                 grad_dict = {}
                 grad_output = torch.autograd.grad(loss, param_output, retain_graph=True)
@@ -168,6 +164,10 @@ if __name__ == '__main__':
 
             batch_time.update(time.time() - end)
             
+            losses.update(loss.data.item(), imgs.size(0))
+            top1.update(prec1.data.item(), imgs.size(0))
+            [prec1] = accuracy(output.data, target, topk=(1,))
+
             end = time.time()
             if i % (args.print_freq) == 0:
                 #plot_grad_flow(model.named_parameters())
