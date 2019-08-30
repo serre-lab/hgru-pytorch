@@ -118,7 +118,7 @@ if __name__ == '__main__':
             
             output, states  = model.forward(imgs)
             state_last = states[-1]
-            state_2nd_last = states[-2]  # etach_param_with_grad([states[-2]])[0]
+            state_2nd_last = detach_param_with_grad([states[-2]])[0]
             loss = criterion(output, target)
             tuple_params = [(nn, pp) for nn, pp in model.named_parameters()]
             names, params = zip(*tuple_params)
