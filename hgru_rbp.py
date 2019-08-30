@@ -209,8 +209,8 @@ class hConvGRU(nn.Module):
         for i in range(self.timesteps):
             internal_state  = self.unit1(x, internal_state, timestep=i)
             if i == self.timesteps - 2:
-                # states += [detach_param_with_grad([internal_state])[0]]
-                states += [internal_state]
+                states += [detach_param_with_grad([internal_state])[0]]
+                # states += [internal_state]
             elif i == self.timesteps - 1:
                 states += [internal_state]
 
