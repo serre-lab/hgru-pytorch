@@ -135,10 +135,6 @@ class hConvGRUCell(nn.Module):
 
     def forward(self, input_, prev_state2, timestep=0):
 
-        if timestep == 0:
-            prev_state2 = torch.empty_like(input_)
-            init.xavier_normal_(prev_state2)
-
         #import pdb; pdb.set_trace()
         i = timestep
         if self.batchnorm:
@@ -177,7 +173,7 @@ class hConvGRU(nn.Module):
         
         self.conv0 = nn.Conv2d(1, 25, kernel_size=7, padding=3)
         part1 = np.load("gabor_serre.npy")
-        self.conv0.weight.data = torch.FloatTensor(part1)
+        self.conv0.weight.data = torch.cuda.FloatTensor(part1)
         
         self.unit1 = hConvGRUCell(25, 25, filt_size)
         print("Training with filter size:",filt_size,"x",filt_size)
@@ -200,21 +196,19 @@ class hConvGRU(nn.Module):
         init.constant_(self.fc.bias, 0)
 
     def forward(self, x):
-        internal_state = None
-        #import pdb; pdb.set_trace()
-        #print(x.shape)
         x = self.conv0(x)
         x = torch.pow(x, 2)
+        internal_state = torch.zeros_like(x, requires_grad=True)
+        # internal_state = internal_state.cuda() if x.is_cuda else internal_state
         states = []        
         for i in range(self.timesteps):
-            internal_state  = self.unit1(x, internal_state, timestep=i)
+            internal_state = self.unit1(x, internal_state, timestep=i)
             if i == self.timesteps - 2:
                 states += [detach_param_with_grad([internal_state])[0]]
+                print('Detaching timestep %s/%s' % (i + 1, self.timesteps))
                 # states += [internal_state]
-            elif i == self.timesteps - 1:
+            else:
                 states += [internal_state]
-
-        assert len(states) == 2
         output = self.bn(internal_state)
         output = F.relu(self.conv6(output))
         output = self.maxpool(output)
