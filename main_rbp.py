@@ -27,6 +27,8 @@ from utils.model_helper import detach_param_with_grad
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
+from torchviz import make_dot
+
 global best_prec1
 best_prec1 = 0
 args = parser.parse_args()
@@ -119,7 +121,13 @@ if __name__ == '__main__':
             output, states = model.forward(imgs)
             state_last = states[-1]
             state_2nd_last = states[-2]
+
             loss = criterion(output, target)
+            
+            #import ipdb; ipdb.set_trace()
+            #test = make_dot(loss, params=dict(model.named_parameters()))
+            #test.render(filename='testnew.dot')
+            #import ipdb; ipdb.set_trace()
             tuple_params = [(nn, pp) for nn, pp in model.named_parameters()]
             names, params = zip(*tuple_params)
 
@@ -135,8 +143,7 @@ if __name__ == '__main__':
                 grad_output = torch.autograd.grad(loss, param_output, retain_graph=True)
                 for nn, gg in zip(name_output, grad_output):
                    grad_dict[nn] = gg
-
-                import ipdb; ipdb.set_trace()
+                #import ipdb; ipdb.set_trace()
                 grad_state_last = torch.autograd.grad(loss, state_last, retain_graph=True)
                 grad_update = RBP(param_update,
                    [state_last],
@@ -146,9 +153,10 @@ if __name__ == '__main__':
                    eta=1.0e-5,
                    truncate_iter=8,
                    rbp_method='Neumann_RBP')
+                #import ipdb; ipdb.set_trace()
                 for nn, gg in zip(name_update, grad_update):
                    grad_dict[nn] = gg
-                grad = [grad_dict[nn] for nn, pp in self.named_parameters()]
+                grad = [grad_dict[nn] for nn, pp in model.named_parameters()]
             else:
                 grad = torch.autograd.grad(loss, params)
             
@@ -160,14 +168,17 @@ if __name__ == '__main__':
                 pp.grad = ww
 
             optimizer.step()
+            #import ipdb; ipdb.set_trace()
+            #[print(nn, pp.shape) for nn, pp in model.named_parameters()]
             optimizer.zero_grad()
 
             batch_time.update(time.time() - end)
             
             losses.update(loss.data.item(), imgs.size(0))
-            top1.update(prec1.data.item(), imgs.size(0))
+            
             [prec1] = accuracy(output.data, target, topk=(1,))
-
+            top1.update(prec1.data.item(), imgs.size(0))
+            
             end = time.time()
             if i % (args.print_freq) == 0:
                 #plot_grad_flow(model.named_parameters())

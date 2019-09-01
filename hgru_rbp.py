@@ -101,7 +101,9 @@ class hConvGRUCell(nn.Module):
 
         if self.batchnorm:
             #self.bn = nn.ModuleList([nn.GroupNorm(25, 25, eps=1e-03) for i in range(32)])
-            self.bn = nn.ModuleList([nn.BatchNorm2d(25, eps=1e-03, affine=False) for i in range(32)])
+            self.bn = nn.ModuleList([nn.BatchNorm2d(25, eps=1e-03, affine=False) for i in range(4)])
+#            self.scales = [nn.Parameter(torch.tensor(0.1)) for i in range(4)]
+#            self.intercepts = [nn.Parameter(torch.tensor(0.)) for i in range(4)]
         else:
             self.n = nn.Parameter(torch.randn(self.timesteps,1,1))
 
@@ -138,14 +140,14 @@ class hConvGRUCell(nn.Module):
         #import pdb; pdb.set_trace()
         i = timestep
         if self.batchnorm:
-            g1_t = torch.sigmoid(self.bn[i*4+0](self.u1_gate(prev_state2) * self.scale[0] + self.mu[0]))
-            c1_t = self.bn[i*4+1](F.conv2d(prev_state2 * g1_t, self.w_gate_inh, padding=self.padding)) * self.scale[1] + self.mu[1]
+            g1_t = torch.sigmoid(self.bn[0](self.u1_gate(prev_state2) * self.scale[0] + self.intercept[0]))
+            c1_t = self.bn[1](F.conv2d(prev_state2 * g1_t, self.w_gate_inh, padding=self.padding)) * self.scale[1] + self.intercept[1]
             
             next_state1 = F.relu(input_ - F.relu(c1_t*(self.alpha*prev_state2 + self.mu)))
             #next_state1 = F.relu(input_ - c1_t*(self.alpha*prev_state2 + self.mu))
             
-            g2_t = torch.sigmoid(self.bn[i*4+2](self.u2_gate(next_state1)) * self.scale[2] + self.mu[2])
-            c2_t = self.bn[i*4+3](F.conv2d(next_state1, self.w_gate_exc, padding=self.padding)) * self.scale[3] + self.mu[3]
+            g2_t = torch.sigmoid(self.bn[2](self.u2_gate(next_state1))) * self.scale[2] + self.intercept[2]
+            c2_t = self.bn[3](F.conv2d(next_state1, self.w_gate_exc, padding=self.padding)) * self.scale[3] + self.intercept[3]
             
             h2_t = F.relu(self.kappa*next_state1 + self.gamma*c2_t + self.w*next_state1*c2_t)
             #h2_t = F.relu(self.kappa*next_state1 + self.kappa*self.gamma*c2_t + self.w*next_state1*self.gamma*c2_t)
@@ -173,7 +175,7 @@ class hConvGRU(nn.Module):
         
         self.conv0 = nn.Conv2d(1, 25, kernel_size=7, padding=3)
         part1 = np.load("gabor_serre.npy")
-        self.conv0.weight.data = torch.cuda.FloatTensor(part1)
+        self.conv0.weight.data = torch.FloatTensor(part1)
         
         self.unit1 = hConvGRUCell(25, 25, filt_size)
         print("Training with filter size:",filt_size,"x",filt_size)
@@ -198,17 +200,25 @@ class hConvGRU(nn.Module):
     def forward(self, x):
         x = self.conv0(x)
         x = torch.pow(x, 2)
-        internal_state = torch.zeros_like(x, requires_grad=True)
+        internal_state = torch.zeros_like(x, requires_grad=False)
         # internal_state = internal_state.cuda() if x.is_cuda else internal_state
         states = []        
         for i in range(self.timesteps):
-            internal_state = self.unit1(x, internal_state, timestep=i)
-            if i == self.timesteps - 2:
-                states += [detach_param_with_grad([internal_state])[0]]
-                print('Detaching timestep %s/%s' % (i + 1, self.timesteps))
-                # states += [internal_state]
-            else:
+            if i < self.timesteps-2:
+                #print('with no grad timestep %s/%s' % (i, self.timesteps))
+                with torch.no_grad():
+                    internal_state = self.unit1(x, internal_state, timestep=i)
+            elif i==self.timesteps-2:
+                #print('with grad detatched timestep %s/%s' % (i, self.timesteps))
+                internal_state = self.unit1(x, internal_state, timestep=i)
+                internal_state.detach_()
+                internal_state.requires_grad = True
                 states += [internal_state]
+            else:
+                #print('with grad timestep %s/%s' % (i, self.timesteps))
+                internal_state = self.unit1(x, internal_state, timestep=i)
+                states += [internal_state]
+        
         output = self.bn(internal_state)
         output = F.relu(self.conv6(output))
         output = self.maxpool(output)

@@ -57,14 +57,14 @@ def RBP(params_dynamic,
     neumann_v_prev = grad_state_last
 
     for ii in range(truncate_iter):
-      import ipdb; ipdb.set_trace()
+      #import ipdb; ipdb.set_trace()
       neumann_v = torch.autograd.grad(
           state_last,
           state_2nd_last,
           grad_outputs=neumann_v_prev,
           retain_graph=True,
           allow_unused=True)
-      import ipdb; ipdb.set_trace()
+      #import ipdb; ipdb.set_trace()
       neumann_g = [x + y for x, y in zip(neumann_g_prev, neumann_v)]
       neumann_v_prev = neumann_v
       neumann_g_prev = neumann_g

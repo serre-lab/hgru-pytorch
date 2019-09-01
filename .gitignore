@@ -6,3 +6,4 @@ test_images.txt
 train_images.txt
 *.pth.tar
 *.npy
+*.pyc
