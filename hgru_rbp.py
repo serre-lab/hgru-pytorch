@@ -3,8 +3,8 @@ import torch.nn.functional as F
 import torch
 import numpy as np
 from torch.nn import init
-from utils.model_helper import detach_param_with_grad
-#torch.manual_seed(42)
+# from utils.model_helper import detach_param_with_grad
+# torch.manual_seed(42)
 
 
 class FFConvNet(nn.Module):
@@ -211,8 +211,8 @@ class hConvGRU(nn.Module):
             elif i==self.timesteps-2:
                 #print('with grad detatched timestep %s/%s' % (i, self.timesteps))
                 internal_state = self.unit1(x, internal_state, timestep=i)
-                internal_state.detach_()
-                internal_state.requires_grad = True
+                internal_state.detach()
+                # internal_state.requires_grad = True
                 states += [internal_state]
             else:
                 #print('with grad timestep %s/%s' % (i, self.timesteps))

@@ -11,7 +11,7 @@ import time
 import torch
 from torchvision.transforms import Compose as transcompose
 import torch.nn.parallel
-import torch.optim
+import rbp_optim
 import numpy as np
 
 from dataset import DataSetPol
@@ -27,7 +27,10 @@ from utils.model_helper import detach_param_with_grad
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-from torchviz import make_dot
+try:
+    from torchviz import make_dot
+except Exception as e:
+    print('Failed to import torchviz: %s' % e)
 
 global best_prec1
 best_prec1 = 0
@@ -96,7 +99,7 @@ if __name__ == '__main__':
 
     grad_method = 'RBP'
     criterion = torch.nn.CrossEntropyLoss().to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = rbp_optim.Adam(model.parameters(), lr=args.lr)
 
     lr_init = args.lr
     print("Starting training: ")
@@ -149,9 +152,9 @@ if __name__ == '__main__':
                    [state_last],
                    [state_2nd_last],
                    grad_state_last,
-                   update_forward_diff=None,  # _update_forward_diff,
-                   eta=1.0e-5,
-                   truncate_iter=8,
+                   # update_forward_diff=None,
+                   # eta=1.0e-5,
+                   truncate_iter=60,
                    rbp_method='Neumann_RBP')
                 #import ipdb; ipdb.set_trace()
                 for nn, gg in zip(name_update, grad_update):
