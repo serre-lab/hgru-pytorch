@@ -60,6 +60,8 @@ def validate(val_loader, model, iter, criterion, logger=None):
         for i, (imgs, target) in enumerate(val_loader):
             target = target.cuda()
             imgs = imgs.cuda()
+            imgs = imgs.float().div(255.)
+            end = time.time()
             output = model.forward(imgs)
             
             loss = criterion(output, target)
@@ -122,7 +124,7 @@ if __name__ == '__main__':
             
             imgs = imgs.to(device)
             target = target.to(device)
-            
+            imgs = imgs.float().div(255.)
             output, states = model.forward(imgs)
             state_last = states[-1]
             state_2nd_last = states[-2]
@@ -156,7 +158,7 @@ if __name__ == '__main__':
                    grad_state_last,
                    # update_forward_diff=None,
                    # eta=1.0e-5,
-                   truncate_iter=10,
+                   truncate_iter=5,
                    rbp_method='Neumann_RBP')
                 #import ipdb; ipdb.set_trace()
                 for nn, gg in zip(name_update, grad_update):

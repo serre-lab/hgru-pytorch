@@ -13,7 +13,7 @@ class FFConvNet(nn.Module):
         # super().__init__()
         self.conv0 = nn.Conv2d(1, 25, kernel_size=7, bias=False, padding=3)
         kernel = np.load("gabor_serre.npy")
-        self.conv0.weight.data = torch.FloatTensor(kernel)
+        self.conv0.weight.data = torch.FloatTensor(kernel)  # .half()
         
         self.conv1 = nn.Conv2d(25, 9, kernel_size=19, padding=9)
         self.bn1 = nn.BatchNorm2d(9)
@@ -175,7 +175,7 @@ class hConvGRU(nn.Module):
         
         self.conv0 = nn.Conv2d(1, 25, kernel_size=7, padding=3)
         part1 = np.load("gabor_serre.npy")
-        self.conv0.weight.data = torch.FloatTensor(part1)
+        self.conv0.weight.data = torch.FloatTensor(part1)  # .half()
         
         self.unit1 = hConvGRUCell(25, 25, filt_size)
         print("Training with filter size:",filt_size,"x",filt_size)
